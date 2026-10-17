@@ -31,6 +31,12 @@ function db(): PDO
     return $pdo;
 }
 function e(string $value): string { return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
+function app_base_path(): string
+{
+    $path = str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'] ?? '/')));
+    return $path === '/' || $path === '.' ? '' : rtrim($path, '/');
+}
+function app_url(string $path = ''): string { return app_base_path() . '/' . ltrim($path, '/'); }
 function csrf_token(): string { return $_SESSION['csrf'] ??= bin2hex(random_bytes(32)); }
 function csrf_check(): void
 {
@@ -40,7 +46,7 @@ function csrf_check(): void
 }
 function admin_required(): void
 {
-    if (empty($_SESSION['admin_id'])) { header('Location: /admin.php'); exit; }
+    if (empty($_SESSION['admin_id'])) { header('Location: ' . app_url('admin.php')); exit; }
 }
 function redirect(string $url): never { header('Location: ' . $url); exit; }
 function event_by_token(string $token): ?array

@@ -10,7 +10,7 @@ return [
         'charset' => 'utf8mb4',
     ],
     'storage_path' => '/home/USUARIO_CPANEL/eventqr_fotos',
-    'public_url' => 'https://example.com',
+    'public_url' => 'https://example.com/qr-eventos',
     'max_file_bytes' => 52428800,
     'upload_limit_per_hour' => 120,
 ];

@@ -1,7 +1,7 @@
 ---
 deployment:
   tasks:
-    - export DEPLOYPATH="$HOME/lamoradadelviento.com"
+    - export DEPLOYPATH="$HOME/lamoradadelviento.com/qr-eventos"
     - export PRIVATEDIR="$HOME/eventqr_private"
     - /bin/mkdir -p "$DEPLOYPATH" "$PRIVATEDIR"
     - /bin/cp -R public/. "$DEPLOYPATH/"
