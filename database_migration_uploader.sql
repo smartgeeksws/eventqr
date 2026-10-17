@@ -1,0 +1,2 @@
+ALTER TABLE fotos
+  ADD COLUMN subido_por VARCHAR(120) NOT NULL DEFAULT '' AFTER evento_id;

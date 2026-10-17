@@ -7,9 +7,36 @@ if (!is_dir($privateDir)) $privateDir = dirname(__DIR__) . '/private';
 require $privateDir . '/bootstrap.php';
 header('Content-Type: application/json; charset=utf-8'); header('Cache-Control: no-store');
 function fail_upload(int $status, string $message): never { http_response_code($status); echo json_encode(['ok'=>false,'message'=>$message], JSON_UNESCAPED_UNICODE); exit; }
+function make_preview(string $sourcePath, string $previewPath, string $mime): bool
+{
+    if (!extension_loaded('gd')) return false;
+    $loaders = ['image/jpeg'=>'imagecreatefromjpeg', 'image/png'=>'imagecreatefrompng', 'image/webp'=>'imagecreatefromwebp'];
+    $loader = $loaders[$mime] ?? null;
+    if (!$loader || !function_exists($loader) || !function_exists('imagejpeg')) return false;
+    $details = @getimagesize($sourcePath);
+    if (!$details || $details[0] < 1 || $details[1] < 1 || $details[0] * $details[1] > 24000000) return false;
+    $memoryLimit = trim((string)ini_get('memory_limit'));
+    if ($memoryLimit !== '' && $memoryLimit !== '-1' && preg_match('/^(\d+)\s*([KMG])?$/i', $memoryLimit, $matches)) {
+        $limitBytes = (int)$matches[1] * match (strtoupper($matches[2] ?? '')) { 'G'=>1073741824, 'M'=>1048576, 'K'=>1024, default=>1 };
+        if (memory_get_usage(true) + ($details[0] * $details[1] * 8) > $limitBytes * 0.7) return false;
+    }
+    $source = @$loader($sourcePath);
+    if (!$source) return false;
+    $scale = min(1, 1440 / max($details[0], $details[1]));
+    $width = max(1, (int)round($details[0] * $scale)); $height = max(1, (int)round($details[1] * $scale));
+    $preview = imagecreatetruecolor($width, $height);
+    $white = imagecolorallocate($preview, 255, 255, 255); imagefill($preview, 0, 0, $white);
+    $resized = imagecopyresampled($preview, $source, 0, 0, 0, 0, $width, $height, $details[0], $details[1]);
+    $saved = $resized && @imagejpeg($preview, $previewPath, 76);
+    imagedestroy($preview); imagedestroy($source);
+    if (!$saved) @unlink($previewPath);
+    return $saved;
+}
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') fail_upload(405, 'Método no permitido.');
 $token = (string)($_POST['token'] ?? ''); $event = event_by_token($token);
 if (!$event || !(int)$event['activo']) fail_upload(404, 'El evento ya no está disponible.');
+$uploader = trim((string)($_POST['uploader'] ?? ''));
+if ($uploader === '' || (function_exists('mb_strlen') ? mb_strlen($uploader) : strlen($uploader)) > 120) fail_upload(422, 'Indica quién está enviando las fotografías.');
 if (empty($_FILES['photo']) || is_array($_FILES['photo']['name'])) fail_upload(400, 'Archivo inválido.');
 $base = rtrim($config['storage_path'], '/\\');
 if (!is_dir($base) && !mkdir($base, 0700, true) && !is_dir($base)) fail_upload(500, 'No se pudo preparar el almacenamiento.');
@@ -37,6 +64,8 @@ if (!is_dir($folder) && !mkdir($folder, 0700, true) && !is_dir($folder)) fail_up
 @chmod($folder, 0700); $internal = bin2hex(random_bytes(32)); $path = $folder . DIRECTORY_SEPARATOR . $internal . '.' . $allowed[$mime];
 if (!move_uploaded_file($file['tmp_name'], $path)) fail_upload(500, 'No se pudo guardar la fotografía.');
 @chmod($path, 0600);
-try { $q = db()->prepare('INSERT INTO fotos (evento_id, nombre_interno, nombre_original, mime, bytes) VALUES (?, ?, ?, ?, ?)'); $q->execute([$event['id'], $internal, basename((string)$file['name']), $mime, (int)$file['size']]); }
-catch (Throwable $e) { @unlink($path); fail_upload(500, 'No se pudo registrar la fotografía.'); }
+$previewPath = $folder . DIRECTORY_SEPARATOR . $internal . '.preview.jpg';
+if (make_preview($path, $previewPath, $mime)) @chmod($previewPath, 0600);
+try { $q = db()->prepare('INSERT INTO fotos (evento_id, subido_por, nombre_interno, nombre_original, mime, bytes) VALUES (?, ?, ?, ?, ?, ?)'); $q->execute([$event['id'], $uploader, $internal, basename((string)$file['name']), $mime, (int)$file['size']]); }
+catch (Throwable $e) { @unlink($path); @unlink($previewPath); fail_upload(500, 'No se pudo registrar la fotografía.'); }
 echo json_encode(['ok'=>true], JSON_UNESCAPED_UNICODE);

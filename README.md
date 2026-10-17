@@ -4,14 +4,14 @@ Aplicación sencilla de recepción privada de fotografías para PHP 8.3, MySQL y
 
 ## Instalación en cPanel
 
-1. En cPanel crea una base MySQL y un usuario, asígnalo a la base con todos los permisos e importa `database.sql` con phpMyAdmin.
+1. En cPanel crea una base MySQL y un usuario, asígnalo a la base con todos los permisos e importa `database.sql` con phpMyAdmin. Si la base ya existe, importa una sola vez `database_migration_uploader.sql` antes de desplegar esta versión.
 2. Crea una carpeta privada fuera de `public_html`, por ejemplo `/home/TU_USUARIO/eventqr_private`, y copia allí el directorio `private` completo. Copia `private/config.example.php` como `private/config.php`.
 3. Edita `config.php`: completa los datos MySQL, `storage_path` como `/home/TU_USUARIO/eventqr_fotos` y `public_url` con el dominio HTTPS del sitio. Mantén `config.php` fuera de `public_html`.
 4. Copia el contenido de `public/` a la carpeta donde se publicará EventQR. Para instalarlo en un subdirectorio como `/qr-eventos`, copia allí los archivos y conserva `assets/` debajo de ese directorio.
 5. El núcleo privado se busca primero en `$HOME/eventqr_private/` cuando el sitio está desplegado; en el código fuente local se carga desde `private/`. El CLI carga el bootstrap relativo a su propia carpeta.
 6. Crea la carpeta indicada en `storage_path` fuera de `public_html` con permisos 700 (si PHP no puede crearla automáticamente). No configures esa carpeta como subdominio ni alias web.
 7. Desde Terminal de cPanel ejecuta: `php /home/TU_USUARIO/eventqr_private/bin/create_admin.php admin 'Una-clave-larga-y-unica'`. Usa una contraseña de al menos 12 caracteres y no la guardes en archivos públicos.
-8. En cPanel selecciona PHP 8.3 y habilita PDO MySQL, Fileinfo y, para aceptar HEIC, EXIF con soporte HEIC. Ajusta `upload_max_filesize` y `post_max_size` a más de 50M, y `max_file_uploads` a 1 o más. Cada archivo se envía en una petición individual.
+8. En cPanel selecciona PHP 8.3 y habilita PDO MySQL, Fileinfo y GD para crear vistas previas ligeras. Para aceptar HEIC, habilita EXIF con soporte HEIC. Activa también ZIP para descargar todas las fotos juntas. Ajusta `upload_max_filesize` y `post_max_size` a más de 50M, y `max_file_uploads` a 1 o más. Cada archivo se envía en una petición individual.
 9. Comprueba que el sitio usa HTTPS e inicia sesión en `/qr-eventos/admin.php` (o la ruta que hayas elegido).
 
 ## Despliegue automático desde GitHub
@@ -30,7 +30,7 @@ La cuenta de hosting necesita Git, SSH y la función Git Version Control de cPan
 
 ## Uso
 
-Desde Administración crea un evento. Descarga su QR SVG; se genera localmente en el navegador y contiene el enlace público del evento. Comparte el QR. En la galería privada puedes descargar cada original o eliminarlo, y puedes cerrar o volver a activar el evento.
+Desde Administración crea un evento. Descarga su QR SVG; se genera localmente en el navegador y contiene el enlace público del evento. Comparte el QR. Los invitados indican su nombre al subir. La galería muestra una vista previa reducida cuando GD está disponible; los archivos originales se conservan sin cambios. Desde la galería puedes descargar cada original, descargar todas las fotos del evento en un ZIP o eliminar fotos. También puedes cerrar o reactivar eventos.
 
 ## Notas operativas
 
