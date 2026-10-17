@@ -1,6 +1,10 @@
 <?php
 declare(strict_types=1);
-require dirname(__DIR__) . '/private/bootstrap.php'; admin_required();
+$homeDir = getenv('HOME');
+$privateDir = $homeDir ? rtrim($homeDir, '/\\') . DIRECTORY_SEPARATOR . 'eventqr_private' : dirname(__DIR__) . '/eventqr_private';
+if (!is_dir($privateDir)) $privateDir = dirname(__DIR__) . '/eventqr_private';
+if (!is_dir($privateDir)) $privateDir = dirname(__DIR__) . '/private';
+require $privateDir . '/bootstrap.php'; admin_required();
 $id = (int)($_GET['id'] ?? 0); $q = db()->prepare('SELECT * FROM eventos WHERE id=?'); $q->execute([$id]); $event = $q->fetch(); if (!$event) { http_response_code(404); exit('Evento no encontrado.'); }
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check(); $photoId = (int)($_POST['photo_id'] ?? 0); $q = db()->prepare('SELECT * FROM fotos WHERE id=? AND evento_id=?'); $q->execute([$photoId, $id]); $photo = $q->fetch();

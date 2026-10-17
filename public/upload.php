@@ -1,6 +1,10 @@
 <?php
 declare(strict_types=1);
-require dirname(__DIR__) . '/private/bootstrap.php';
+$homeDir = getenv('HOME');
+$privateDir = $homeDir ? rtrim($homeDir, '/\\') . DIRECTORY_SEPARATOR . 'eventqr_private' : dirname(__DIR__) . '/eventqr_private';
+if (!is_dir($privateDir)) $privateDir = dirname(__DIR__) . '/eventqr_private';
+if (!is_dir($privateDir)) $privateDir = dirname(__DIR__) . '/private';
+require $privateDir . '/bootstrap.php';
 header('Content-Type: application/json; charset=utf-8'); header('Cache-Control: no-store');
 function fail_upload(int $status, string $message): never { http_response_code($status); echo json_encode(['ok'=>false,'message'=>$message], JSON_UNESCAPED_UNICODE); exit; }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') fail_upload(405, 'Método no permitido.');

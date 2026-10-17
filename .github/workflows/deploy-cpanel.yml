@@ -1,0 +1,33 @@
+name: Deploy to cPanel
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the pushed commit
+        uses: actions/checkout@v4
+      - name: Forward this commit to the cPanel repository
+        env:
+          CPANEL_GIT_URL: ${{ vars.CPANEL_GIT_URL }}
+          CPANEL_SSH_PRIVATE_KEY: ${{ secrets.CPANEL_SSH_PRIVATE_KEY }}
+          CPANEL_KNOWN_HOSTS: ${{ secrets.CPANEL_KNOWN_HOSTS }}
+        run: |
+          set -eu
+          if [ -z "$CPANEL_GIT_URL" ] || [ -z "$CPANEL_SSH_PRIVATE_KEY" ] || [ -z "$CPANEL_KNOWN_HOSTS" ]; then
+            echo "Deployment skipped: configure CPANEL_GIT_URL, CPANEL_SSH_PRIVATE_KEY, and CPANEL_KNOWN_HOSTS in GitHub."
+            exit 0
+          fi
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+          printf '%s\n' "$CPANEL_SSH_PRIVATE_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$CPANEL_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+          eval "$(ssh-agent -s)"
+          ssh-add "$HOME/.ssh/id_ed25519"
+          git push "$CPANEL_GIT_URL" HEAD:main

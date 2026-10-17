@@ -1,6 +1,10 @@
 <?php
 declare(strict_types=1);
-require dirname(__DIR__) . '/private/bootstrap.php'; admin_required();
+$homeDir = getenv('HOME');
+$privateDir = $homeDir ? rtrim($homeDir, '/\\') . DIRECTORY_SEPARATOR . 'eventqr_private' : dirname(__DIR__) . '/eventqr_private';
+if (!is_dir($privateDir)) $privateDir = dirname(__DIR__) . '/eventqr_private';
+if (!is_dir($privateDir)) $privateDir = dirname(__DIR__) . '/private';
+require $privateDir . '/bootstrap.php'; admin_required();
 $q = db()->prepare('SELECT f.*, e.id AS eid FROM fotos f JOIN eventos e ON e.id=f.evento_id WHERE f.id=?'); $q->execute([(int)($_GET['id'] ?? 0)]); $photo = $q->fetch();
 if (!$photo) { http_response_code(404); exit; }
 $ext = ['image/jpeg'=>'jpg','image/png'=>'png','image/webp'=>'webp','image/heic'=>'heic','image/heif'=>'heic','image/heic-sequence'=>'heic','image/heif-sequence'=>'heic'][$photo['mime']] ?? null;

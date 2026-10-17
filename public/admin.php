@@ -1,6 +1,10 @@
 <?php
 declare(strict_types=1);
-require dirname(__DIR__) . '/private/bootstrap.php';
+$homeDir = getenv('HOME');
+$privateDir = $homeDir ? rtrim($homeDir, '/\\') . DIRECTORY_SEPARATOR . 'eventqr_private' : dirname(__DIR__) . '/eventqr_private';
+if (!is_dir($privateDir)) $privateDir = dirname(__DIR__) . '/eventqr_private';
+if (!is_dir($privateDir)) $privateDir = dirname(__DIR__) . '/private';
+require $privateDir . '/bootstrap.php';
 if (!empty($_SESSION['admin_id'])) redirect('/events.php');
 $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {

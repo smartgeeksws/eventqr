@@ -1,0 +1,9 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH="$HOME/public_html"
+    - export PRIVATEDIR="$HOME/eventqr_private"
+    - /bin/mkdir -p "$DEPLOYPATH" "$PRIVATEDIR"
+    - /bin/cp -R public/. "$DEPLOYPATH/"
+    - /bin/cp -R private/. "$PRIVATEDIR/"
+    - /bin/chmod 700 "$PRIVATEDIR"
