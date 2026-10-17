@@ -11,6 +11,8 @@ jobs:
     steps:
       - name: Check out the pushed commit
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Forward this commit to the cPanel repository
         env:
           CPANEL_GIT_URL: ${{ vars.CPANEL_GIT_URL }}
