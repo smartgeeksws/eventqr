@@ -1,0 +1,6 @@
+private/config.php
+private/eventqr_fotos/
+eventqr_fotos/
+*.log
+.DS_Store
+Thumbs.db
