@@ -7,6 +7,9 @@ if (!is_dir($privateDir)) $privateDir = dirname(__DIR__) . '/private';
 require $privateDir . '/bootstrap.php';
 header('Content-Type: application/json; charset=utf-8'); header('Cache-Control: no-store');
 function fail_upload(int $status, string $message): never { http_response_code($status); echo json_encode(['ok'=>false,'message'=>$message], JSON_UNESCAPED_UNICODE); exit; }
+if ((int)($_SERVER['CONTENT_LENGTH'] ?? 0) > 0 && empty($_POST) && empty($_FILES)) {
+    fail_upload(413, 'El servidor rechazó la carga por su límite post_max_size. Súbelo en la configuración PHP de cPanel.');
+}
 function make_preview(string $sourcePath, string $previewPath, string $mime): bool
 {
     if (!extension_loaded('gd')) return false;
@@ -39,7 +42,7 @@ $uploader = trim((string)($_POST['uploader'] ?? ''));
 if ($uploader === '' || (function_exists('mb_strlen') ? mb_strlen($uploader) : strlen($uploader)) > 120) fail_upload(422, 'Indica quién está enviando las fotografías.');
 if (empty($_FILES['photo']) || is_array($_FILES['photo']['name'])) fail_upload(400, 'Archivo inválido.');
 $base = rtrim($config['storage_path'], '/\\');
-if (!is_dir($base) && !mkdir($base, 0700, true) && !is_dir($base)) fail_upload(500, 'No se pudo preparar el almacenamiento.');
+if (!is_dir($base) && !mkdir($base, 0700, true) && !is_dir($base)) fail_upload(500, 'No se pudo crear la carpeta de fotos. Revisa storage_path y los permisos en cPanel.');
 $limitFile = fopen($base . DIRECTORY_SEPARATOR . '.limit-' . client_ip_key(), 'c+');
 if (!$limitFile || !flock($limitFile, LOCK_EX)) fail_upload(500, 'No se pudo comprobar el límite de carga.');
 $rawLimits = stream_get_contents($limitFile); $times = $rawLimits ? json_decode($rawLimits, true) : [];
@@ -47,7 +50,18 @@ if (!is_array($times)) $times = [];
 $times = array_values(array_filter($times, static fn($time) => is_int($time) && $time > time() - 3600));
 if (count($times) >= (int)$config['upload_limit_per_hour']) { flock($limitFile, LOCK_UN); fclose($limitFile); fail_upload(429, 'Has alcanzado el límite temporal de cargas.'); }
 $times[] = time(); rewind($limitFile); ftruncate($limitFile, 0); fwrite($limitFile, json_encode($times)); fflush($limitFile); flock($limitFile, LOCK_UN); fclose($limitFile);
-$file = $_FILES['photo']; if ($file['error'] !== UPLOAD_ERR_OK) fail_upload(400, 'No se pudo recibir el archivo.');
+$file = $_FILES['photo'];
+if ($file['error'] !== UPLOAD_ERR_OK) {
+    $uploadErrors = [
+        UPLOAD_ERR_INI_SIZE => 'El servidor rechazó la foto por upload_max_filesize. Configura el límite en cPanel por encima de 50 MB.',
+        UPLOAD_ERR_FORM_SIZE => 'La foto supera el límite permitido por el formulario.',
+        UPLOAD_ERR_PARTIAL => 'La conexión se interrumpió mientras subía la foto. Inténtalo otra vez con una conexión estable.',
+        UPLOAD_ERR_NO_TMP_DIR => 'El servidor no tiene carpeta temporal de carga configurada.',
+        UPLOAD_ERR_CANT_WRITE => 'El servidor no pudo escribir el archivo temporal. Contacta al hosting.',
+        UPLOAD_ERR_EXTENSION => 'Una extensión PHP detuvo la carga. Contacta al hosting.',
+    ];
+    fail_upload(400, $uploadErrors[$file['error']] ?? 'No se pudo recibir el archivo.');
+}
 if ($file['size'] < 1 || $file['size'] > min(52428800, (int)$config['max_file_bytes'])) fail_upload(413, 'Cada fotografía debe pesar hasta 50 MB.');
 if (!is_uploaded_file($file['tmp_name'])) fail_upload(400, 'Carga inválida.');
 $finfo = new finfo(FILEINFO_MIME_TYPE); $mime = $finfo->file($file['tmp_name']);
@@ -60,12 +74,12 @@ if ($mime === 'image/heic' || $mime === 'image/heif' || $mime === 'image/heic-se
 }
 if (!isset($allowed[$mime])) fail_upload(415, 'Formato no permitido.');
 $folder = $base . DIRECTORY_SEPARATOR . (int)$event['id'];
-if (!is_dir($folder) && !mkdir($folder, 0700, true) && !is_dir($folder)) fail_upload(500, 'No se pudo preparar el almacenamiento.');
+if (!is_dir($folder) && !mkdir($folder, 0700, true) && !is_dir($folder)) fail_upload(500, 'No se pudo crear la carpeta del evento. Revisa los permisos de eventqr_fotos.');
 @chmod($folder, 0700); $internal = bin2hex(random_bytes(32)); $path = $folder . DIRECTORY_SEPARATOR . $internal . '.' . $allowed[$mime];
-if (!move_uploaded_file($file['tmp_name'], $path)) fail_upload(500, 'No se pudo guardar la fotografía.');
+if (!move_uploaded_file($file['tmp_name'], $path)) fail_upload(500, 'No se pudo guardar la fotografía. Revisa que PHP pueda escribir en eventqr_fotos.');
 @chmod($path, 0600);
 $previewPath = $folder . DIRECTORY_SEPARATOR . $internal . '.preview.jpg';
 if (make_preview($path, $previewPath, $mime)) @chmod($previewPath, 0600);
 try { $q = db()->prepare('INSERT INTO fotos (evento_id, subido_por, nombre_interno, nombre_original, mime, bytes) VALUES (?, ?, ?, ?, ?, ?)'); $q->execute([$event['id'], $uploader, $internal, basename((string)$file['name']), $mime, (int)$file['size']]); }
-catch (Throwable $e) { @unlink($path); @unlink($previewPath); fail_upload(500, 'No se pudo registrar la fotografía.'); }
+catch (Throwable $e) { error_log('EventQR photo insert failed: ' . $e->getMessage()); @unlink($path); @unlink($previewPath); fail_upload(500, 'No se pudo registrar la foto en la base de datos. Revisa la migración y la conexión MySQL.'); }
 echo json_encode(['ok'=>true], JSON_UNESCAPED_UNICODE);
